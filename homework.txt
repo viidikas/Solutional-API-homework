@@ -1,0 +1,77 @@
+# Homework Task
+
+There is an API running at https://homework.solutional.ee. Your task is to
+implement the same API. Functionality not offered by the reference API is not required to be implemented.
+
+This is a fictional 3rd party API that has no documentation and there's no access to it's source code,
+but due to third party integrations the API needs to stay exactly the same as it is.
+
+NB! This API does not reflect Solutional's understanding of a good API design. If anything is unclear, feel free to ask.
+
+## API General Description
+
+API implements a very simple e-commerce cart/order flow:
+
+1. It has a list of products;
+2. Products can be added to the order;
+3. Products can be modified within the order;
+4. Products can be replaced when assembled.
+
+
+## API Endpoints
+
+Here's all the API endpoints with usage examples you need to implement:
+
+* GET /api/products - list of all available products
+    ```
+    curl https://homework.solutional.ee/api/products
+    ```
+
+* POST /api/orders - create new order
+    ```
+    curl -X POST https://homework.solutional.ee/api/orders
+    ```
+
+* GET /api/orders/:order_id - get order details
+    ```
+    curl https://homework.solutional.ee/api/orders/:order_id
+    ```
+
+* PATCH /api/orders/:order_id - update order
+    ```
+    curl -X PATCH --data '{"status": "PAID"}' \
+      https://homework.solutional.ee/api/orders/:order_id
+    ```
+
+* GET /api/orders/:order_id/products - get order products
+    ```
+    curl https://homework.solutional.ee/api/orders/:order_id/products
+    ```
+
+* POST /api/orders/:order_id/products - add products to order
+    ```
+    curl --data '[123]' -H "Content-Type: application/json" \
+      https://homework.solutional.ee/api/orders/:order_id/products
+    ```
+
+* PATCH /api/orders/:order_id/products/:product_id - update product quantity
+    ```
+    curl -X PATCH --data '{"quantity": 33}' -H "Content-Type: application/json" \
+      https://homework.solutional.ee/api/orders/:order_id/products/:product_id
+    ```
+
+* PATCH /api/orders/:order_id/products/:product_id - add a replacement product
+    ```
+    curl -X PATCH --data '{"replaced_with": {"product_id": 123, "quantity": 6}}' -H "Content-Type: application/json" \
+      https://homework.solutional.ee/api/orders/:order_id/products/:product_id
+    ```
+
+## Goals
+
+1. Implement all API endpoints described above;
+2. For `GET /api/products` endpoint keep products list exactly the same as is
+   done in the reference API - same products with same attributes (even `id`);
+3. Make it possible to configure listening port number of the application without any need to change the code;
+4. Before starting actual development, provide us with an estimation of when this task is going to be ready.
+
+PS! For simplicity - orders do not need to be persisted between application restarts.

@@ -1,0 +1,18 @@
+package com.solutional.homework.order.util;
+
+import com.solutional.homework.order.model.OrderProduct;
+
+import java.util.UUID;
+
+public class OrderProductFactory {
+    OrderProduct orderProducts = new OrderProduct();
+
+        orderProducts.setProductId(product.getId());
+        orderProducts.setName(product.getName());
+        orderProducts.setPrice(product.getPrice());
+        orderProducts.setId(UUID.randomUUID().toString());
+        orderProducts.setQuantity(1L);
+        orderProducts.setReplacedWith(product);
+
+        return orderProducts;
+}
