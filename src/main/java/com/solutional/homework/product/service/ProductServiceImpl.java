@@ -26,7 +26,7 @@ public class ProductServiceImpl implements ProductService{
         return productRepository.findAll().stream().map(ProductFactory::fromProductDbo).collect(Collectors.toList());
     }
 
-
+    @Override
     public Product getProduct(Long id) {
         Optional<ProductDbo> productDbo = productRepository.findById(id);
         if (productRepository.findById(id).isPresent()) {

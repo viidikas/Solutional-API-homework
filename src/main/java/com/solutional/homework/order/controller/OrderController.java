@@ -1,12 +1,13 @@
 package com.solutional.homework.order.controller;
 
 import com.solutional.homework.order.model.Order;
+import com.solutional.homework.order.model.OrderProduct;
 import com.solutional.homework.order.service.OrderService;
-import com.solutional.homework.product.service.model.Product;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -27,13 +28,19 @@ public class OrderController {
     }
 
     @PatchMapping("{orderId}")
-    public ResponseEntity<Order> updateOrder(@PathVariable String orderId, @RequestBody String orderStatus) {
+    public ResponseEntity<Order> updateOrder(@PathVariable String orderId, @RequestBody String orderStatus) throws IOException {
         return ResponseEntity.ok(orderService.updateOrder(orderId, orderStatus));
     }
 
     @GetMapping("{orderId}/products")
-    public ResponseEntity<List<Product>> getOrderProducts(@PathVariable String orderId) {
-        return ResponseEntity.ok(orderService.getOrderProducts(orderId));
+    public ResponseEntity<List<OrderProduct>> getOrderProducts(@PathVariable String orderId) {
+
+         return ResponseEntity.ok(orderService.getOrderProducts(orderId));
+    }
+
+    @PostMapping("{orderId}/products")
+    public ResponseEntity<String> addProductsToOrder(@PathVariable String orderId, @RequestBody List<Long> productIds) {
+        return ResponseEntity.ok(orderService.addOrderProducts(orderId, productIds));
     }
 
 

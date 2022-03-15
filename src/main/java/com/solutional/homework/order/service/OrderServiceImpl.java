@@ -1,21 +1,20 @@
 package com.solutional.homework.order.service;
 
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solutional.homework.error.ClientError;
-import com.solutional.homework.order.model.Order;
-import com.solutional.homework.order.model.OrderAmount;
-import com.solutional.homework.order.model.OrderProduct;
-import com.solutional.homework.order.model.OrderStatusCode;
-import com.solutional.homework.product.repository.entity.ProductDbo;
+import com.solutional.homework.order.model.*;
+import com.solutional.homework.order.util.OrderProductFactory;
 import com.solutional.homework.product.service.ProductService;
 import com.solutional.homework.product.service.model.Product;
 import lombok.RequiredArgsConstructor;
+import org.json.simple.JSONObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -27,13 +26,6 @@ public class OrderServiceImpl implements OrderService{
     private HashMap<String, HashMap<Long, OrderProduct>> orderProductHashMap = new HashMap<>();
 
     private final ProductService productService;
-
-    @Override
-    public String addOrderProducts(String orderId, List<Long> productIds) {
-        confirmOrderExistence(orderId);
-        productIds.forEach(productId -> addProductToOrder(productId, orderId));
-        return "OK";
-    }
 
     private void confirmOrderExistence(String orderId) {
         Order order = orderHashMap.get(orderId);
@@ -49,16 +41,36 @@ public class OrderServiceImpl implements OrderService{
         }
     }
 
+    @Override
+    public String addOrderProducts(String orderId, List<Long> productIds) {
+        confirmOrderExistence(orderId);
+        confirmOrderNotPaid(orderId);
+        productIds.forEach(productId -> addProductToOrder(productId, orderId));
+        return "OK";
+    }
+
     private void addProductToOrder(Long productId, String orderId){
         HashMap<Long, OrderProduct> orderProducts = orderProductHashMap.get(orderId);
-        OrderProduct orderProduct = orderProducts.get(productId);
-        if(orderProduct != null) {
+
+        //Kui ostukorv on tühi.
+        if (orderProducts == null) {
+            HashMap<Long, OrderProduct> orderProductNew = new HashMap<>();
+
+            Product product = productService.getProduct(productId);
+            OrderProduct orderProduct = OrderProductFactory.fromProduct(product);
+
+            orderProductNew.put(productId, orderProduct);
+            orderProductHashMap.put(orderId, orderProductNew);
+
+            
+
+
+        } else {
+            OrderProduct orderProduct = orderProducts.get(productId);
             orderProduct.setQuantity(orderProduct.getQuantity() + 1);
             orderProducts.put(productId, orderProduct);
-        } else {
-            Product product = productService.getProduct(productId);
         }
-
+        orderProductHashMap.put(orderId, orderProducts);
     }
 
     @Override
@@ -67,6 +79,8 @@ public class OrderServiceImpl implements OrderService{
         if (order == null){
             throw new ClientError("Not found", HttpStatus.NOT_FOUND);
         }
+//        HashMap<Long, OrderProduct> orderProducts = orderProductHashMap.get(id);
+//        order.setProducts(orderProducts);
         return order;
     }
 
@@ -89,25 +103,28 @@ public class OrderServiceImpl implements OrderService{
 
     @Override
     public List<OrderProduct> getOrderProducts(String id) {
-        Order order = orderHashMap.get(id);
-        return order.getProducts();
+        HashMap<Long, OrderProduct> order = orderProductHashMap.get(id);
+        List<OrderProduct> list = new ArrayList<OrderProduct>(order.values());
+        return list;
         
     }
 
     @Override
-    public Order updateOrder(String id, String orderStatusCode) {
+    public Order updateOrder(String id, String orderStatusCode) throws JsonProcessingException {
         Order order = getOrder(id);
         OrderStatusCode orderStatusCodeConverted;
 
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode neoJsonNode = mapper.readTree(orderStatusCode);
+
         try {
-            orderStatusCodeConverted = OrderStatusCode.valueOf(orderStatusCode);
+            orderStatusCodeConverted = OrderStatusCode.valueOf(neoJsonNode.get("status").asText());
         } catch (IllegalArgumentException e){
             throw new ClientError("Invalid order status", HttpStatus.BAD_REQUEST);
         }
         if(!OrderStatusCode.PAID.equals(orderStatusCodeConverted) || !OrderStatusCode.NEW.equals(order.getStatus())){
             throw new ClientError("Invalid order status", HttpStatus.BAD_REQUEST);
         }
-
         order.setStatus(orderStatusCodeConverted);
         orderHashMap.put(order.getId(), order);
         return order;
