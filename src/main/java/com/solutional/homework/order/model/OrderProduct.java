@@ -3,7 +3,6 @@ package com.solutional.homework.order.model;
 import com.solutional.homework.product.service.model.Product;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import javax.persistence.Entity;
 
 @Data
 @AllArgsConstructor

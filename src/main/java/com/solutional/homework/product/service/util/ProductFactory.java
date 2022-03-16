@@ -19,18 +19,4 @@ public final class ProductFactory {
         return product;
     }
 
-    public static OrderProduct fromProduct(Product product) {
-
-        OrderProduct orderProducts = new OrderProduct();
-
-        orderProducts.setProductId(product.getId());
-        orderProducts.setName(product.getName());
-        orderProducts.setPrice(product.getPrice());
-        orderProducts.setId(UUID.randomUUID().toString());
-        orderProducts.setQuantity(1L);
-        orderProducts.setReplacedWith(product);
-
-        return orderProducts;
-
-    }
 }

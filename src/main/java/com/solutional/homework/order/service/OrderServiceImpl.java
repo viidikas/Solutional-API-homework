@@ -5,12 +5,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solutional.homework.error.ClientError;
+import com.solutional.homework.error.ProductError;
+import com.solutional.homework.error.SystemError;
 import com.solutional.homework.order.model.*;
 import com.solutional.homework.order.util.OrderProductFactory;
 import com.solutional.homework.product.service.ProductService;
 import com.solutional.homework.product.service.model.Product;
 import lombok.RequiredArgsConstructor;
-import org.json.simple.JSONObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -41,36 +42,74 @@ public class OrderServiceImpl implements OrderService{
         }
     }
 
+    private void confirmOrderProductListExistence(String orderId) {
+        if(!orderProductHashMap.containsKey(orderId)) {
+            HashMap<Long, OrderProduct> orderProducts = new HashMap<>();
+            orderProductHashMap.put(orderId, orderProducts);
+        }
+    }
+
     @Override
     public String addOrderProducts(String orderId, List<Long> productIds) {
         confirmOrderExistence(orderId);
         confirmOrderNotPaid(orderId);
+        confirmOrderProductListExistence(orderId);
         productIds.forEach(productId -> addProductToOrder(productId, orderId));
         return "OK";
     }
 
     private void addProductToOrder(Long productId, String orderId){
+        Product product = productService.getProduct(productId);
+        OrderProduct orderProduct = OrderProductFactory.fromProduct(product);
+
+        boolean productExistsInOrder = orderProductHashMap.get(orderId).containsKey(productId);
         HashMap<Long, OrderProduct> orderProducts = orderProductHashMap.get(orderId);
 
-        //Kui ostukorv on tühi.
-        if (orderProducts == null) {
-            HashMap<Long, OrderProduct> orderProductNew = new HashMap<>();
-
-            Product product = productService.getProduct(productId);
-            OrderProduct orderProduct = OrderProductFactory.fromProduct(product);
-
-            orderProductNew.put(productId, orderProduct);
-            orderProductHashMap.put(orderId, orderProductNew);
-
-            
-
-
-        } else {
-            OrderProduct orderProduct = orderProducts.get(productId);
-            orderProduct.setQuantity(orderProduct.getQuantity() + 1);
+        if(!productExistsInOrder) {
             orderProducts.put(productId, orderProduct);
+            orderProductHashMap.put(orderId, orderProducts);
+
+            Order order = orderHashMap.get(orderId);
+            List<OrderProduct> list = new ArrayList<>(orderProducts.values());
+            order.setProducts(list);
         }
-        orderProductHashMap.put(orderId, orderProducts);
+         else {
+            long currentQuantity = orderProducts.get(productId).getQuantity();
+            orderProducts.get(productId).setQuantity(currentQuantity + 1);
+            orderProductHashMap.put(orderId, orderProducts);
+
+            Order order = orderHashMap.get(orderId);
+            List<OrderProduct> list = new ArrayList<>(orderProducts.values());
+            order.setProducts(list);
+        }
+    }
+    @Override
+    public String updateProductQuantity(String orderId, String productId, String quantity) {
+
+        OrderProduct product = getOrderProductById(orderId, productId);
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode neoJsonNode;
+        try {
+            neoJsonNode = mapper.readTree(quantity);
+        } catch (JsonProcessingException e) {
+            throw new SystemError("System error");
+        }
+        product.setQuantity(product.getQuantity() + neoJsonNode.get("quantity").asLong());
+        return "OK";
+    }
+
+    private OrderProduct getOrderProductById(String orderId, String id) {
+        HashMap<Long, OrderProduct> orderProductHashMap = this.orderProductHashMap.get(orderId);
+
+        Optional<Map.Entry<Long, OrderProduct>> orderProductById = orderProductHashMap.entrySet()
+                .stream().filter(x -> x.getValue().getId().equals(id))
+                .findFirst();
+
+        if(orderProductById.isPresent()) {
+            return orderProductById.get().getValue();
+        } else {
+            throw new ClientError("Not Found", HttpStatus.BAD_REQUEST);
+        }
     }
 
     @Override
@@ -79,8 +118,6 @@ public class OrderServiceImpl implements OrderService{
         if (order == null){
             throw new ClientError("Not found", HttpStatus.NOT_FOUND);
         }
-//        HashMap<Long, OrderProduct> orderProducts = orderProductHashMap.get(id);
-//        order.setProducts(orderProducts);
         return order;
     }
 
@@ -103,20 +140,26 @@ public class OrderServiceImpl implements OrderService{
 
     @Override
     public List<OrderProduct> getOrderProducts(String id) {
+
         HashMap<Long, OrderProduct> order = orderProductHashMap.get(id);
-        List<OrderProduct> list = new ArrayList<OrderProduct>(order.values());
-        return list;
-        
+        if (order == null) {
+            throw new ClientError("Not Found", HttpStatus.NOT_FOUND);
+        }
+                return new ArrayList<>(order.values());
     }
 
     @Override
-    public Order updateOrder(String id, String orderStatusCode) throws JsonProcessingException {
+    public Order updateOrder(String id, String orderStatusCode) {
         Order order = getOrder(id);
         OrderStatusCode orderStatusCodeConverted;
 
         ObjectMapper mapper = new ObjectMapper();
-        JsonNode neoJsonNode = mapper.readTree(orderStatusCode);
-
+        JsonNode neoJsonNode = null;
+        try {
+            neoJsonNode = mapper.readTree(orderStatusCode);
+        } catch (JsonProcessingException e) {
+            throw new SystemError("Invalid JSON");
+        }
         try {
             orderStatusCodeConverted = OrderStatusCode.valueOf(neoJsonNode.get("status").asText());
         } catch (IllegalArgumentException e){
@@ -130,26 +173,43 @@ public class OrderServiceImpl implements OrderService{
         return order;
     }
 
-//    @Override
-//    public List<OrderProduct> getOrderProducts(String id) {
-//        Order order = getOrder(id);
-//        if (order == null){
-//            throw new ClientError("Not found", HttpStatus.NOT_FOUND);
-//        }
-//        return order.getProducts();
-//    }
-//
-//    public OrderProduct addProductsToOrder(String orderId, Long productId) {
-//        Order order = getOrder(orderId);
-//
-//        if (order == null){
-//            throw new ClientError("Not found", HttpStatus.NOT_FOUND);
-//        }
-//
-//       // Product product = productService.getProduct(productId);
-//    }
+    @Override
+    public String replaceProduct(String orderId, String productId, String replacedWith) {
+
+        confirmOrderExistence(orderId);
+        confirmOrderNotPaid(orderId);
+        OrderProduct orderProduct;
+
+        try {
+            orderProduct = getOrderProductById(orderId, productId);
+        } catch(NullPointerException e) {
+            String error = ProductError.class.toString();
+            throw new ClientError(error, HttpStatus.BAD_REQUEST);
+            //Siin peaks hoopis ProductErrorDetaili sisse kirjutama Bad Request.
+        }
+
+        try {
+        JsonNode neoJsonNode;
+        neoJsonNode = new ObjectMapper().readTree(replacedWith);
+
+        long quantity = neoJsonNode.get("replaced_with").get("quantity").asLong();
+        long id = neoJsonNode.get("replaced_with").get("product_id").asLong();
+
+        Product product = productService.getProduct(id);
+        product.setQuantity(quantity);
+        orderProduct.setReplacedWith(product);
+
+        HashMap<Long, OrderProduct> orderProducts = orderProductHashMap.get(orderId);
+        OrderProduct orderProductInHashMap = orderProducts.get(productId);
+        orderProductInHashMap.setReplacedWith(product);
+
+    } catch (JsonProcessingException e) {
+            String error = ProductError.class.toString();
+        throw new ClientError(error, HttpStatus.NOT_FOUND);
+       //Siin peaks hoopis ProductErrorDetaili sisse kirjutama Not found.
+    }
 
 
-
-
+     return "OK";
+    }
 }
