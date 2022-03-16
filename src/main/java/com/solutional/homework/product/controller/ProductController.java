@@ -1,7 +1,6 @@
 package com.solutional.homework.product.controller;
 
 import com.solutional.homework.product.service.ProductService;
-import com.solutional.homework.product.service.model.Product;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("api/")
@@ -16,10 +16,10 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductDtoMapper productDtoMapper;
 
     @GetMapping("products")
-    public ResponseEntity<List<Product>> getProducts() {
-
-        return ResponseEntity.ok(productService.getProducts());
+    public ResponseEntity<List<ProductDto>> getProducts() {
+        return ResponseEntity.ok(productService.getProducts().stream().map(productDtoMapper::map).collect(Collectors.toList()));
     }
 }
